@@ -9,71 +9,98 @@ namespace GodCheck
         [JsonProperty("插件主要开关", Order = -12)]
         public bool Enabled { get; set; } = true;
 
-        [JsonProperty("打击玩家Buff", Order = -11)]
-        public int BuffType = 39;
+        [JsonProperty("检查无敌玩家Buff", Order = -11)]
+        public int[] BuffType = new int[] { 39, 67, 80, 144 };
 
-        [JsonProperty("打击玩家间隔", Order = -10)]
-        public double SkipTimer = 1.5;
+        [JsonProperty("检查Buff时长", Order = -11)]
+        public int BuffTimer { get; set; } = 20;
 
-        [JsonProperty("玩家杀怪间隔", Order = -9)]
-        public double StrikeTimer = 300.0;
+        [JsonProperty("伤怪触发检查无敌秒数", Order = -10)]
+        public double StrikeTimer = 120.0;
 
-        [JsonProperty("BOSS期检间隔", Order = -9)]
-        public double BossRangeTimer { get; set; } = 15.0;
+        [JsonProperty("靠近BOSS检查无敌格数", Order = -9)]
+        public double BossRange { get; set; } = 10.0;
 
-        [JsonProperty("接近BOSS范围", Order = -9)]
-        public double BossRange { get; set; } = 30.0;
 
-        [JsonProperty("检测玩家防御", Order = -8)]
+        [JsonProperty("检查修改防御", Order = -8)]
         public bool CheckDefense { get; set; } = true;
 
-        [JsonProperty("监控玩家受伤", Order = -7)]
-        public bool MonHurt { get; set; } = false;
-
-        [JsonProperty("最大报伤数值", Order = -6)]
-        public int MonHurtValue { get; set; } = 25;
-
-        [JsonProperty("监控玩家血量", Order = -5)]
-        public bool MonLife { get; set; } = true;
-
-        [JsonProperty("真实伤害减免", Order = -3)]
+        [JsonProperty("允许受伤计算的免伤率", Order = -7)]
         public float DamageReduction = 0.7f;
 
-        [JsonProperty("低于真伤不判", Order = -2)]
+        [JsonProperty("受伤低于多少不算违规", Order = -6)]
         public int IgnoringDamage { get; set; } = 20;
 
-        [JsonProperty("检查血量溢出", Order = -1)]
-        public bool LifeSpill = false;
+        [JsonProperty("播报玩家血量变化", Order = -5)]
+        public bool MonLife { get; set; } = true;
 
-        [JsonProperty("检查血量上限", Order = -1)]
+        [JsonProperty("播报玩家受伤数值", Order = -5)]
+        public bool MonHurt { get; set; } = true;
+
+        [JsonProperty("受伤低于多少不会播报", Order = -5)]
+        public int MonHurtValue { get; set; } = 25;
+
+
+        [JsonProperty("检查修改治疗", Order = -4)]
+        public bool CheckHeal { get; set; } = true;
+
+        [JsonProperty("治疗超过多少触发惩罚", Order = -3)]
+        public int HealValue { get; set; } = 50;
+
+        [JsonProperty("间隔低于多少触发惩罚", Order = -2)]
+        public int HealTimer { get; set; } = 30;
+
+        [JsonProperty("靠近护士忽略惩罚格数", Order = -1)]
+        public double NurseRange { get; set; } = 30;
+
+        [JsonProperty("播报玩家治疗", Order = 0)]
+        public bool MonHeal { get; set; } = true;
+
+        [JsonProperty("治疗低于多少不会播报", Order = 0)]
+        public int MonHealValue { get; set; } = 50;
+
+        [JsonProperty("惩罚血量上限增幅不合理", Order = 10)]
         public bool MaxLifeSpill = false;
 
-        [JsonProperty("违规次数开罚", Order = 0)]
+        [JsonProperty("惩罚违规次数", Order = 11)]
         public int TrialsCount = 2;
 
-        [JsonProperty("踢出玩家", Order = 1)]
-        public bool Kick = false;
+        [JsonProperty("惩罚踢出玩家", Order = 12)]
+        public bool Kick = true;
 
-        [JsonProperty("封禁玩家", Order = 2)]
-        public bool Ban = true;
+        [JsonProperty("惩罚封禁开关", Order = 13)]
+        public bool Ban = false;
 
-        [JsonProperty("封禁时长", Order = 3)]
-        public int BanTime = 10;
+        [JsonProperty("封禁秒数", Order = 14)]
+        public int BanTime = 600;
 
-        [JsonProperty("传送玩家", Order = 4)]
-        public bool TP = false;
+        [JsonProperty("封禁IP", Order = 15)]
+        public bool BanIP = false;
 
-        [JsonProperty("传送坐标", Order = 5)]
-        public Point Position { get; set; }
+        [JsonProperty("封禁账号", Order = 16)]
+        public bool BanAccount = true;
 
-        [JsonProperty("施加BUFF", Order = 6)]
+        [JsonProperty("封禁设备", Order = 17)]
+        public bool BanUUID = false;
+
+
+        [JsonProperty("惩罚传送玩家", Order = 18)]
+        public bool PunTP = false;
+
+        [JsonProperty("传送坐标", Order = 19)]
+        public Point PunPosition { get; set; }
+
+        [JsonProperty("惩罚施加BUFF", Order = 20)]
+        public bool PunBuff { get; set; } = false;
+
+        [JsonProperty("惩罚BUFF表", Order = 20)]
         public Dictionary<int, int>? BuffID { get; set; }
         #endregion
 
         #region 预设参数方法
         public void Ints()
         {
-            Position = new Point(0, 2400);
+            PunPosition = new Point(0, 0);
 
             BuffID = new Dictionary<int, int>() 
             { 

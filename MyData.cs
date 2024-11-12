@@ -5,7 +5,7 @@ namespace GodCheck
     internal class MyData
     {
         [JsonProperty("玩家数据", Order = 20)]
-        public List<PlayerData> Items { get; set; } = new List<PlayerData>();
+        public List<PlayerData> player { get; set; } = new List<PlayerData>();
 
         #region 玩家数据结构
         public class PlayerData
@@ -15,9 +15,6 @@ namespace GodCheck
 
             [JsonProperty("索引", Order = 0)]
             public int Index { get; set; }
-
-            [JsonProperty("伤检", Order = 1)]
-            public bool Check { get; set; }
 
             [JsonProperty("进程", Order = 1)]
             public int Progress { get; set; }
@@ -37,12 +34,22 @@ namespace GodCheck
             [JsonProperty("受伤标记", Order = 4)]
             public bool Hurt { get; set; }
 
+            [JsonProperty("治疗标识", Order = 4)]
+            public bool Heal { get; set; }
+            
+            [JsonProperty("治疗数值", Order = 4)]
+            public int HealValue { get; set; }
+
+            [JsonProperty("上次治疗时间", Order = 5)]
+            public DateTime HealTimer { get; set; }
+
             [JsonProperty("上次伤怪时间", Order = 5)]
             public DateTime StrikeTimer { get; set; }
 
-            [JsonProperty("上次检测时间", Order = 6)]
-            public DateTime LastTimer { get; set; }
+            [JsonProperty("上次检查时间", Order = 5)]
+            public DateTime CheckTimer { get; set; }
 
+            public PlayerData() { }
         }
         #endregion
     }

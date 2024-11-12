@@ -1,7 +1,7 @@
 ﻿using Terraria;
 using Terraria.DataStructures;
 using TShockAPI;
-using static Org.BouncyCastle.Math.EC.ECCurve;
+using static GodCheck.GodCheck;
 
 namespace GodCheck
 {
@@ -44,41 +44,120 @@ namespace GodCheck
         {
             if (data == null) return;
 
-            if (GodCheck.Config.Ban)
+            if (Config.Ban)
             {
                 //自定义封禁时间
                 plr.Disconnect($"你已被封禁！原因：{text}。");
-                Ban.AddBan(plr , $"{text}", GodCheck.Config.BanTime);
+                Ban.AddBan(plr, $"{text}", Config.BanTime);
+                TSPlayer.All.SendMessage($"{plr.Name} 已被封禁！原因：{text}。", 247, 242, 168);
             }
 
-            else if (GodCheck.Config.Kick)
+            if (Config.Kick)
             {
-                plr.Kick($"{plr.Name}" + text + "被踢出.", force: true, silent: false, "Server");
+                plr.Disconnect($"{plr.Name} 已被踢出！原因：{text}。");
+                data.MissCount = 0;
+                TSPlayer.All.SendMessage($"{plr.Name} 已被踢出！原因：{text}。", 247, 242, 168);
             }
 
-            else if (GodCheck.Config.BuffID != null)
+            if (Config.PunBuff && Config.BuffID != null)
             {
-                foreach (var buff in GodCheck.Config.BuffID)
+                foreach (var buff in Config.BuffID)
                 {
                     plr.SetBuff(buff.Key, buff.Value);
                 }
             }
 
-            else if (GodCheck.Config.TP) //直接拉到地狱左下角 别妨碍别人
+            if (Config.PunTP)
             {
-                var x = (GodCheck.Config.Position.X * 16 + GodCheck.Config.Position.X * 16) / 2f;
-                var y = (GodCheck.Config.Position.Y * 16 + GodCheck.Config.Position.Y * 16) / 2f;
-
-                // 直接传送到目标位置
-                plr.Teleport(x, y, 10);
-                TSPlayer.All.SendMessage($"{plr.Name}" + text + "被传送", 247, 242, 168);
+                var centerX = Config.PunPosition.X * 16 + 8;
+                var centerY = Config.PunPosition.Y * 16 + 8;
+                var dx = centerX - plr.TPlayer.Center.X;
+                var dy = centerY - plr.TPlayer.Center.Y;
+                var distance = (float)Math.Sqrt(dx * dx + dy * dy);
+                var targetX = centerX + dx * 2 / distance;
+                var targetY = centerY + dy * 2 / distance;
+                PullTP(plr, targetX, targetY, 2);
             }
 
+            if (plr.Dead || plr.IsBeingDisabled())
+            {
+                data.MissCount = 0;
+            }
         }
         #endregion
 
-        #region 判断玩家与BOSS之间范围
-        public static bool BossRange(TSPlayer plr, NPC npc)
+        #region 拉取玩家的方法
+        public static void PullTP(TSPlayer plr, float x, float y, int r)
+        {
+            if (r <= 0)
+            {
+                plr.Teleport(x, y, 10);
+                return;
+            }
+            float x2 = plr.TPlayer.Center.X;
+            float y2 = plr.TPlayer.Center.Y;
+            x2 -= x;
+            y2 -= y;
+            if (x2 != 0f || y2 != 0f)
+            {
+                double num = Math.Atan2(y2, x2) * 180.0 / Math.PI;
+                x2 = (float)(r * Math.Cos(num * Math.PI / 180.0));
+                y2 = (float)(r * Math.Sin(num * Math.PI / 180.0));
+                x2 += x;
+                y2 += y;
+                plr.Teleport(x2, y2, 10);
+            }
+        } 
+        #endregion
+
+        #region 检测治疗方法
+        public static void Heal(TSPlayer plr, MyData.PlayerData? data, int heal)
+        {
+            if (data == null) return;
+            data.HealValue = heal; // 存储治疗值
+            data.Heal = true; // 标记玩家正在回血
+
+            //对比上次治疗的时间
+            var now = DateTime.UtcNow;
+            var last = 0f;
+            if (data.HealTimer != default)
+            {
+                last = (float)Math.Round((now - data.HealTimer).TotalSeconds, 2);
+            }
+
+            //播报玩家回血,过滤低于10点的回复量
+            if (Config.MonHeal && data.HealValue >= Config.MonHealValue)
+            {
+                TShock.Utils.Broadcast($"玩家:[c/1989BB:{plr.Name}] 治疗:[c/6DD463:{heal}] 上次治疗:[c/F25156:{last}]秒", 237, 234, 152);
+            }
+
+            if (Config.CheckHeal)
+            {
+                //如果治疗量超过50点，间隔少于45秒
+                if (heal >= Config.HealValue && last <= Config.HealTimer)
+                {
+                    // 查找所有NPC
+                    for (int i = 0; i < Main.npc.Length; i++)
+                    {
+                        var npc = Main.npc[i];
+
+                        //不在护士的30格内范围内，进行处罚
+                        if (npc.netID == 18 && npc.active && !NurseRange(plr, npc))
+                        {
+                            var text = $"修改治疗药水间隔 上次治疗: {last} < 45s ";
+                            Pun(plr, data, text);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            data.HealTimer = now; // 记录本次治疗时间
+        }
+        #endregion
+
+        #region 判断玩家与护士之间范围
+        public static bool NurseRange(TSPlayer plr, NPC npc)
         {
             // 计算玩家和Boss之间的距离
             double dX = plr.TPlayer.position.X + (plr.TPlayer.width / 2) - (npc.position.X + (npc.width / 2));
@@ -87,7 +166,21 @@ namespace GodCheck
             // 使用欧几里得距离公式计算实际距离
             double Range = Math.Sqrt(dX * dX + dY * dY);
 
-            return Range <= GodCheck.Config.BossRange * 16f; //每格16像素
+            return Range <= Config.NurseRange * 16f; //每格16像素
+        }
+        #endregion
+
+        #region 判断玩家与BOSS之间范围
+        public static bool BossRange(Player plr, NPC npc)
+        {
+            // 计算玩家和Boss之间的距离
+            double dX = plr.position.X + (plr.width / 2) - (npc.position.X + (npc.width / 2));
+            double dY = plr.position.Y + (plr.height / 2) - (npc.position.Y + (npc.height / 2));
+
+            // 使用欧几里得距离公式计算实际距离
+            double Range = Math.Sqrt(dX * dX + dY * dY);
+
+            return Range <= Config.BossRange * 16f; //每格16像素
         }
         #endregion
     }
