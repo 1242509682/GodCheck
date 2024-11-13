@@ -1,3 +1,3 @@
-copy bin\Release\net6.0\GodCheck.dll C:\Users\羽学\Desktop\Beta\ServerPlugins
+copy bin\Debug\net6.0\GodCheck.dll C:\Users\羽学\Desktop\Beta\ServerPlugins
 del C:\Users\羽学\Desktop\Beta\tshock\无敌检测.json
 taskkill /F /IM TShock.Server.exe

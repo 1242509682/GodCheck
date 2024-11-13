@@ -39,17 +39,22 @@ namespace GodCheck
         }
         #endregion
 
-        #region 惩罚方法
+        #region 惩罚方法 这个方法涵盖了无敌、修改防御、修改血量、修改治疗量
         internal static void Pun(TSPlayer plr, MyData.PlayerData? data, string text)
         {
-            if (data == null) return;
+            if (data == null || !Config.Enabled) return;
 
             if (Config.Ban)
             {
                 //自定义封禁时间
                 plr.Disconnect($"你已被封禁！原因：{text}。");
-                Ban.AddBan(plr, $"{text}", Config.BanTime);
                 TSPlayer.All.SendMessage($"{plr.Name} 已被封禁！原因：{text}。", 247, 242, 168);
+
+                foreach (var ban in Config.Banlist)
+                {
+                    Ban.AddBan(plr, $"{text}", ban);
+                }
+
             }
 
             if (Config.Kick)
@@ -86,52 +91,27 @@ namespace GodCheck
         }
         #endregion
 
-        #region 拉取玩家的方法
-        public static void PullTP(TSPlayer plr, float x, float y, int r)
-        {
-            if (r <= 0)
-            {
-                plr.Teleport(x, y, 10);
-                return;
-            }
-            float x2 = plr.TPlayer.Center.X;
-            float y2 = plr.TPlayer.Center.Y;
-            x2 -= x;
-            y2 -= y;
-            if (x2 != 0f || y2 != 0f)
-            {
-                double num = Math.Atan2(y2, x2) * 180.0 / Math.PI;
-                x2 = (float)(r * Math.Cos(num * Math.PI / 180.0));
-                y2 = (float)(r * Math.Sin(num * Math.PI / 180.0));
-                x2 += x;
-                y2 += y;
-                plr.Teleport(x2, y2, 10);
-            }
-        } 
-        #endregion
-
         #region 检测治疗方法
         public static void Heal(TSPlayer plr, MyData.PlayerData? data, int heal)
         {
             if (data == null) return;
             data.HealValue = heal; // 存储治疗值
-            data.Heal = true; // 标记玩家正在回血
 
-            //对比上次治疗的时间
-            var now = DateTime.UtcNow;
+            var now = DateTime.UtcNow; 
             var last = 0f;
             if (data.HealTimer != default)
             {
+                //上次记录治疗时间
                 last = (float)Math.Round((now - data.HealTimer).TotalSeconds, 2);
             }
 
             //播报玩家回血,过滤低于10点的回复量
             if (Config.MonHeal && data.HealValue >= Config.MonHealValue)
             {
-                TShock.Utils.Broadcast($"玩家:[c/1989BB:{plr.Name}] 治疗:[c/6DD463:{heal}] 上次治疗:[c/F25156:{last}]秒", 237, 234, 152);
+                TShock.Utils.Broadcast($"玩家:[c/1989BB:{plr.Name}] 治疗:[c/6DD463:{heal}] 记录:[c/1989BB:{data.HealValue}] 间隔:[c/F25156:{last}]秒", 237, 234, 152);
             }
 
-            if (Config.CheckHeal)
+            if (Config.CheckHeal) //检查治疗量超标 
             {
                 //如果治疗量超过50点，间隔少于45秒
                 if (heal >= Config.HealValue && last <= Config.HealTimer)
@@ -159,7 +139,7 @@ namespace GodCheck
         #region 判断玩家与护士之间范围
         public static bool NurseRange(TSPlayer plr, NPC npc)
         {
-            // 计算玩家和Boss之间的距离
+            // 计算玩家和护士之间的距离
             double dX = plr.TPlayer.position.X + (plr.TPlayer.width / 2) - (npc.position.X + (npc.width / 2));
             double dY = plr.TPlayer.position.Y + (plr.TPlayer.height / 2) - (npc.position.Y + (npc.height / 2));
 
@@ -181,6 +161,46 @@ namespace GodCheck
             double Range = Math.Sqrt(dX * dX + dY * dY);
 
             return Range <= Config.BossRange * 16f; //每格16像素
+        }
+        #endregion
+
+        #region 拉取玩家的方法
+        public static void PullTP(TSPlayer plr, float x, float y, int r)
+        {
+            if (r <= 0)
+            {
+                plr.Teleport(x, y, 10);
+                return;
+            }
+            float x2 = plr.TPlayer.Center.X;
+            float y2 = plr.TPlayer.Center.Y;
+            x2 -= x;
+            y2 -= y;
+            if (x2 != 0f || y2 != 0f)
+            {
+                double num = Math.Atan2(y2, x2) * 180.0 / Math.PI;
+                x2 = (float)(r * Math.Cos(num * Math.PI / 180.0));
+                y2 = (float)(r * Math.Sin(num * Math.PI / 180.0));
+                x2 += x;
+                y2 += y;
+                plr.Teleport(x2, y2, 10);
+            }
+        }
+        #endregion
+
+        #region 判断BOSS在场 用于辅助检测修改防御时 治疗的容错值（暂时没用到）
+        public static bool IsInBossFight()
+        {
+            // 检查是否有BOSS在场
+            for (int i = 0; i < Main.npc.Length; i++)
+            {
+                var npc = Main.npc[i];
+                if (npc.active && npc.boss)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
         #endregion
     }

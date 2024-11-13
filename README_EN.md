@@ -9,6 +9,13 @@
 ## Update Log
 
 ```
+v1.0.2
+- Optimized logic
+- Added configuration options for broadcasting invincibility checks, checking invincibility during boss fights, etc.
+- Added automatic adjustment of damage reduction rate based on NPC kill progress when the global damage reduction rate is 0.
+- Owner group has immunity from checks.
+- There is still a possibility of false positives in high-frequency healing detection.
+
 v1.0.1
 Removed the check for exceeding the health upper limit (because Tshock handles it itself)
 Added a method to detect healing amounts, with customizable bans by account, UUID, or IP
@@ -39,42 +46,82 @@ Added condition judgment for negative health
 ```json
 {
   "Main Plugin Switch": true,
-  "Check Invincible Player Buffs": [
+  "Broadcast Invincibility Check": true,
+  "Violation Count to Trigger Punishment": 2,
+  "Invincibility Buffs to Check": [
     39,
     67,
     80,
     144
   ],
-  "Check Buff Duration": 20,
-  "Damage Trigger Invincibility Check Interval": 120.0,
-  "Distance to Boss for Invincibility Check": 10.0,
+  "Duration to Check Invincibility Buffs": 30,
+  "Seconds to Check Invincibility After Damage": 120.0,
+  "Seconds to Check Invincibility During Boss Fights": 30.0,
+  "Grids to Check Invincibility Near Boss": 60.0,
   "Check Modified Defense": true,
-  "Allowed Damage Reduction Rate": 0.7,
-  "Damage Below Which Is Not Considered a Violation": 20,
+  "Damage Below Which Is Not Considered Violation": 20,
+  "Global Damage Reduction Rate": 0.0,
+  "NPC to Reset Progress Damage Reduction": 398,
+  "Automatic Progress Damage Reduction Rates": [
+    {
+      "Defeated Status": false,
+      "Damage Reduction Rate": 0.1,
+      "Monster IDs": [
+        1
+      ]
+    },
+    {
+      "Defeated Status": false,
+      "Damage Reduction Rate": 0.27,
+      "Monster IDs": [
+        13
+      ]
+    },
+    {
+      "Defeated Status": false,
+      "Damage Reduction Rate": 0.52,
+      "Monster IDs": [
+        113
+      ]
+    },
+    {
+      "Defeated Status": false,
+      "Damage Reduction Rate": 0.67,
+      "Monster IDs": [
+        125,
+        126,
+        127,
+        134
+      ]
+    }
+  ],
   "Broadcast Player Health Changes": true,
-  "Broadcast Player Damage Numbers": true,
+  "Broadcast Player Damage Amount": true,
   "Damage Below Which Will Not Be Broadcasted": 25,
   "Check Modified Healing": true,
-  "Healing Above Which Triggers Punishment": 50,
-  "Interval Below Which Triggers Punishment": 30,
-  "Ignore Punishment Distance Near Nurses": 30.0,
+  "Healing Amount Exceeding Which Triggers Punishment": 50,
+  "Healing Interval Below Which Triggers Punishment": 30,
+  "Grids to Ignore Punishment Near Nurse": 10.0,
   "Broadcast Player Healing": true,
-  "Healing Below Which Will Not Be Broadcasted": 50,
+  "Healing Below Which Will Not Be Broadcasted": 20,
   "Punish Unreasonable Health Upper Limit Increase": false,
-  "Violation Count for Punishment": 2,
-  "Punish Kick Out Players": true,
+  "Punish by Kicking Player": true,
   "Ban Switch": false,
-  "Ban Duration in Seconds": 600,
-  "Ban by IP": false,
-  "Ban by Account": true,
-  "Ban by Device": false,
-  "Punish Teleport Players": false,
+  "Ban Table": [
+    {
+      "Ban Duration (seconds)": 600,
+      "Ban IP": false,
+      "Ban Account": true,
+      "Ban UUID": false
+    }
+  ],
+  "Punish by Teleporting Player": false,
   "Teleport Coordinates": {
     "X": 0,
     "Y": 0
   },
-  "Punish Apply Buff": false,
-  "Punish Buff Table": {
+  "Punish by Applying Buff": false,
+  "Punishment Buff Table": {
     "156": 3600,
     "122": 240
   }
