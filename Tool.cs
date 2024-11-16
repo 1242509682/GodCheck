@@ -95,44 +95,82 @@ namespace GodCheck
         public static void Heal(TSPlayer plr, MyData.PlayerData? data, int heal)
         {
             if (data == null) return;
+
+            // 更新累计治疗量
+            data.TotalHeal += heal;
             data.HealValue = heal; // 存储治疗值
 
-            var now = DateTime.UtcNow; 
+            var now = DateTime.UtcNow;
             var last = 0f;
             if (data.HealTimer != default)
             {
-                //上次记录治疗时间
+                //上次记录治疗时间，保留2位小数
                 last = (float)Math.Round((now - data.HealTimer).TotalSeconds, 2);
+            }
+
+            //治疗量超过50点
+            var last2 = 0f;
+            if (data.HealTimer2 != default && heal >= Config.HealValue)
+            {
+                //上次自我治疗时间
+                last2 = (float)Math.Round((now - data.HealTimer2).TotalSeconds, 2);
             }
 
             //播报玩家回血,过滤低于10点的回复量
             if (Config.MonHeal && data.HealValue >= Config.MonHealValue)
             {
-                TShock.Utils.Broadcast($"玩家:[c/1989BB:{plr.Name}] 治疗:[c/6DD463:{heal}] 记录:[c/1989BB:{data.HealValue}] 间隔:[c/F25156:{last}]秒", 237, 234, 152);
+                TShock.Utils.Broadcast($"玩家:[c/1989BB:{plr.Name}] 治疗:[c/6DD463:{heal}] 统计:[c/1989BB:{data.TotalHeal}] 间隔:[c/F25156:{last}]秒", 237, 234, 152);
             }
 
-            if (Config.CheckHeal) //检查治疗量超标 
+            // 记录本次治疗时间
+            data.HealTimer = now;
+
+            //检查治疗量配置开关,治疗量超过50点的时间间隔不为0
+            if (Config.CheckHeal && heal >= Config.HealValue && last2 != 0f) 
             {
-                //如果治疗量超过50点，间隔少于45秒
-                if (heal >= Config.HealValue && last <= Config.HealTimer)
+                //间隔少于45秒
+                if (last2 <= Config.HealTimer)
                 {
                     // 查找所有NPC
                     for (int i = 0; i < Main.npc.Length; i++)
                     {
                         var npc = Main.npc[i];
 
-                        //不在护士的30格内范围内，进行处罚
-                        if (npc.netID == 18 && npc.active && !NurseRange(plr, npc))
+                        //如果护士活着
+                        if (npc.netID == 18 && npc.active)
                         {
-                            var text = $"修改治疗药水间隔 上次治疗: {last} < 45s ";
-                            Pun(plr, data, text);
-                            return;
+                            //不在它的范围内 增加违规数
+                            if (!NurseRange(plr, npc))
+                            {
+                                data.MissCount++;
+                            }
+                            else //在范围内 减少违规数
+                            {
+                                data.MissCount = Math.Max(0, data.MissCount - 1);
+                            }
+                        }
+                        else  //护士不存在 不需要考虑范围 直接加违规数
+                        {
+                            data.MissCount++;
+                        }
+
+                        //如果玩家死亡 违规数清空
+                        if (plr.Dead)
+                        {
+                            data.MissCount = 0;
                         }
                     }
                 }
-            }
 
-            data.HealTimer = now; // 记录本次治疗时间
+                if (data.MissCount >= Config.TrialsCount)
+                {
+                    var text = $"修改治疗药水间隔 上次治疗: {last2} < {Config.HealTimer}s ";
+                    Pun(plr, data, text);
+                    return;
+                }
+
+                data.HealTimer2 = now;
+            }
         }
         #endregion
 
@@ -164,6 +202,20 @@ namespace GodCheck
         }
         #endregion
 
+        #region 判断玩家与怪物之间范围
+        public static bool NPCRange(Player plr, NPC npc)
+        {
+            // 计算玩家和怪物之间的距离
+            double dX = plr.position.X + (plr.width / 2) - (npc.position.X + (npc.width / 2));
+            double dY = plr.position.Y + (plr.height / 2) - (npc.position.Y + (npc.height / 2));
+
+            // 使用欧几里得距离公式计算实际距离
+            double Range = Math.Sqrt(dX * dX + dY * dY);
+
+            return Range <= Config.NPCRange * 16f; //每格16像素
+        }
+        #endregion
+
         #region 拉取玩家的方法
         public static void PullTP(TSPlayer plr, float x, float y, int r)
         {
@@ -188,19 +240,34 @@ namespace GodCheck
         }
         #endregion
 
-        #region 判断BOSS在场 用于辅助检测修改防御时 治疗的容错值（暂时没用到）
-        public static bool IsInBossFight()
+        #region 播报玩家闪避方法
+        public static void Dodge(TSPlayer plr, MyData.PlayerData? data, int Dodge)
         {
-            // 检查是否有BOSS在场
-            for (int i = 0; i < Main.npc.Length; i++)
+            var now = DateTime.UtcNow;
+            var last = 0f;
+            if (data.DodgeTimer != default)
             {
-                var npc = Main.npc[i];
-                if (npc.active && npc.boss)
-                {
-                    return true;
-                }
+                //上次记录闪避时间
+                last = (float)Math.Round((now - data.DodgeTimer).TotalSeconds, 2);
             }
-            return false;
+
+            if (Dodge == 1) //忍者大师
+            {
+                TShock.Utils.Broadcast($"玩家:[c/1989BB:{plr.Name}] 触发:[c/6DD463:黑腰带] 上次闪避:[c/F25156:{last}]秒", 237, 234, 152);
+            }
+
+            else if (Dodge == 2) //神圣套
+            {
+                TShock.Utils.Broadcast($"玩家:[c/1989BB:{plr.Name}] 触发:[c/6DD463:神圣套] 上次闪避:[c/F25156:{last}]秒", 237, 234, 152);
+            }
+
+            else if (Dodge == 4) //混乱之脑
+            {
+                TShock.Utils.Broadcast($"玩家:[c/1989BB:{plr.Name}] 触发:[c/6DD463:混乱之脑] 上次闪避:[c/F25156:{last}]秒", 237, 234, 152);
+            }
+
+           
+            data.DodgeTimer = now; // 记录本次治疗时间
         }
         #endregion
     }

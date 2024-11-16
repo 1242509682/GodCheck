@@ -35,14 +35,35 @@ namespace GodCheck
             //重生标识，初始化用
             public bool Spawn { get; set; }
 
-            //受伤标识
+            //遭遇BOSS，玩家受伤标识
             public bool Hurt { get; set; }
+
+            //击中小怪名称
+            public string NpcName { get; set; }
 
             //治疗量
             public int HealValue { get; set; }
 
+            //统计治疗量
+            public int TotalHeal { get; set; }
+
+            //距离过近标识
+            public bool NPCRange { get; set; }
+
+            //距离过近受伤标识
+            public bool Hurt2 { get; set; }
+
+            //闪避标识
+            public bool Dodge { get; set; }
+
+            //上次闪避时间
+            public DateTime DodgeTimer { get; set; }
+
             //上次治疗时间
             public DateTime HealTimer { get; set; }
+
+            //上次自我治疗时间
+            public DateTime HealTimer2 { get; set; }
 
             //上次伤害怪物时间
             public DateTime StrikeTimer { get; set; }

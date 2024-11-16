@@ -16,19 +16,31 @@ namespace GodCheck
         public int TrialsCount = 2;
 
         [JsonProperty("检查无敌玩家Buff", Order = -12)]
-        public int[] BuffType = new int[] { 39, 67, 80, 144 };
+        public int[] BuffType = new int[] { 20, 39, 68 };
 
         [JsonProperty("检查无敌的Buff时长", Order = -11)]
         public int BuffTimer { get; set; } = 30;
 
         [JsonProperty("伤怪触发检查无敌秒数", Order = -10)]
-        public double StrikeTimer = 120.0;
+        public double StrikeTimer = 300.0;
 
         [JsonProperty("BOSS战的检查无敌秒数", Order = -10)]
         public double StrikeBoss = 30.0;
 
-        [JsonProperty("靠近BOSS检查无敌格数", Order = -9)]
+        [JsonProperty("靠近BOSS检查无敌格数", Order = -10)]
         public double BossRange { get; set; } = 60.0;
+
+        [JsonProperty("靠近NPC检查闪避开关", Order = -9)]
+        public bool NPCRangeEnabled { get; set; } = true;
+
+        [JsonProperty("靠近NPC检查闪避格数", Order = -9)]
+        public double NPCRange { get; set; } = 1.0;
+
+        [JsonProperty("靠近NPC检查闪避秒数", Order = -9)]
+        public double StrikeLastTimer { get; set; } = 3.0;
+
+        [JsonProperty("播报玩家闪避", Order = -9)]
+        public bool MonDodge { get; set; } = false;
 
         [JsonProperty("检查修改防御", Order = -8)]
         public bool CheckDefense { get; set; } = true;
@@ -101,17 +113,20 @@ namespace GodCheck
         #region 预设参数方法
         public void Ints()
         {
-            #if DEBUG //这4个监控是开发者测试时看的
+
+#if DEBUG
             MonGod = true;
             MonHurtLife = true;
             MonHurt = true;
             MonHeal = true;
-            #else
+            MonDodge = true;
+#else
             MonGod = false;
             MonHurtLife = false;
             MonHurt = false;
             MonHeal = false;
-            #endif
+            MonDodge = false;
+#endif
 
             PunPosition = new Point(0, 0);
 

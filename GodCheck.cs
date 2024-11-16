@@ -11,7 +11,7 @@ public class GodCheck : TerrariaPlugin
     #region 插件信息
     public override string Name => "无敌检测";
     public override string Author => "羽学";
-    public override Version Version => new Version(1, 0, 2);
+    public override Version Version => new Version(1, 0, 3);
     public override string Description => "涡轮增压不蒸鸭";
     #endregion
 
@@ -22,7 +22,7 @@ public class GodCheck : TerrariaPlugin
         LoadConfig();
         On.Terraria.Player.Hurt += Player_Hurt;
         GeneralHooks.ReloadEvent += ReloadConfig;
-        ServerApi.Hooks.NpcKilled.Register(this, KillItem);
+        ServerApi.Hooks.NpcKilled.Register(this, NpcKilled);
         GetDataHandlers.PlayerSpawn.Register(this.PlayerSpawn!);
         ServerApi.Hooks.NetGetData.Register(this, this.GetData);
         ServerApi.Hooks.NpcSpawn.Register(this, this.NpcSpawn);
@@ -36,7 +36,7 @@ public class GodCheck : TerrariaPlugin
         {
             On.Terraria.Player.Hurt -= Player_Hurt;
             GeneralHooks.ReloadEvent -= ReloadConfig;
-            ServerApi.Hooks.NpcKilled.Deregister(this, KillItem);
+            ServerApi.Hooks.NpcKilled.Deregister(this, NpcKilled);
             GetDataHandlers.PlayerSpawn.UnRegister(this.PlayerSpawn!);
             ServerApi.Hooks.NetGetData.Deregister(this, this.GetData);
             ServerApi.Hooks.NpcSpawn.Deregister(this, this.NpcSpawn);
@@ -79,16 +79,23 @@ public class GodCheck : TerrariaPlugin
                 Name = plr.Name,
                 Index = plr.Index,
                 Progress = 0,
+                Spawn = true,
                 MissCount = 0,
+                StrikeTimer = DateTime.UtcNow
             });
         }
         else
         {
             var data = Data.player.FirstOrDefault(x => x.Name == plr.Name);
-            if (data != null && data.Name == plr.Name)
+            if (data != null)
             {
-                data.Spawn = true;
+                data.Progress = 0;
                 data.MissCount = 0;
+                data.StrikeTimer = DateTime.UtcNow;
+                data.HealValue = 0;
+                data.TotalHeal = 0;
+                data.HealTimer = default;
+                data.HealTimer2 = default;
             }
         }
     }
@@ -100,16 +107,19 @@ public class GodCheck : TerrariaPlugin
         var plr = args.Player;
         var data = Data.player.FirstOrDefault(x => x.Name == plr.Name);
 
-        if (plr == null || !plr.Active || !plr.IsLoggedIn || !Config.Enabled)
+        if (plr == null || !plr.Active || !plr.IsLoggedIn || !Config.Enabled || data == null)
         {
             return;
         }
-
-        if (data != null)
+        else
         {
-            data.Progress = 0;
-            data.Spawn = true;
             data.StrikeTimer = DateTime.UtcNow;
+            data.MissCount = 0;
+            data.HealValue = 0;
+            data.TotalHeal = 0;
+            data.HealTimer = default;
+            data.HealTimer2 = default;
+            data.Progress = 0;
         }
     }
     #endregion
@@ -138,39 +148,46 @@ public class GodCheck : TerrariaPlugin
             {
                 if (dodgeable) //触发无敌帧
                 {
-                    if (!Crit && BOSS) //排除暴击 只判断BOSS与弹幕
-                    {
-                        //减防伤害为 最小值为1 最大值为非暴击伤害 - 玩家防御
-                        var RealDamage = Math.Max(1, Math.Min(Damage - plr.statDefense, Damage));
+                    data.Hurt2 = true; //用于辅助判断无限闪避用的标识
 
-                        //如果全局免伤率不为0，则设置为全局免伤
-                        if (Config.DamageReduction != 0)
+                    if (BOSS) //排除暴击 只判断BOSS与弹幕
+                    {
+                        if (!Crit)
                         {
-                            //真实伤害为 减防伤害 - (减防伤害 * 70%免伤) 只取整数 耐力Buff-10% 蠕虫围巾-17% 海龟套-15% 冰冻海龟壳-25%
-                            data.RealDamage = RealDamage - (int)(RealDamage * Config.DamageReduction);
-                        }
-                        else //否则遍历 自动进度免伤表 根据表内NPC击败情况来赋值当前免伤率（按数值越大的那个算）
-                        {
-                            foreach (var npc2 in Config.BossList)
+                            //减防伤害为 最小值为1 最大值为非暴击伤害 - 玩家防御
+                            var RealDamage = Math.Max(1, Math.Min(Damage - plr.statDefense, Damage));
+
+                            //如果全局免伤率不为0，则设置为全局免伤
+                            if (Config.DamageReduction != 0)
                             {
-                                if (npc2.Enabled)
+                                //真实伤害为 减防伤害 - (减防伤害 * 70%免伤) 只取整数 耐力Buff-10% 蠕虫围巾-17% 海龟套-15% 冰冻海龟壳-25%
+                                data.RealDamage = RealDamage - (int)(RealDamage * Config.DamageReduction);
+                            }
+                            else //否则遍历自动进度免伤表 根据表内NPC击败情况来赋值当前免伤率（按数值越大的那个算）
+                            {
+                                foreach (var npc2 in Config.BossList)
                                 {
-                                    data.RealDamage = RealDamage - (int)(RealDamage * npc2.DamageReduction);
+                                    //当NPC死亡时，这个标识自动会开启
+                                    if (npc2.Enabled)
+                                    {
+                                        data.RealDamage = RealDamage - (int)(RealDamage * npc2.DamageReduction);
+                                    }
                                 }
                             }
-                        }
 
-                        //开启受伤标识
-                        data.Hurt = true;
+                            //开启受伤标识
+                            data.Hurt = true;
 
-                        //播报伤害，过滤伤害信息：只播报超过25点减防伤害 
-                        if (Config.MonHurt && RealDamage >= Config.MonHurtValue)
-                        {
-                            TShock.Utils.Broadcast($"玩家:[c/E2E4C4:{plr.name}] 未减防:[c/F0BB77:{Damage}] 减防:[c/F25156:{RealDamage}] " +
-                                $"减免伤:[c/86B4E3:{data.RealDamage}] 来源:[c/97E587:{name}]", 222, 192, 223);
+                            //播报伤害，过滤伤害信息：只播报超过25点减防伤害 
+                            if (Config.MonHurt && RealDamage >= Config.MonHurtValue)
+                            {
+                                TShock.Utils.Broadcast($"玩家:[c/E2E4C4:{plr.name}] 未减防:[c/F0BB77:{Damage}] 减防:[c/F25156:{RealDamage}] " +
+                                    $"减免伤:[c/86B4E3:{data.RealDamage}] 来源:[c/97E587:{name}]", 222, 192, 223);
+                            }
                         }
                     }
                 }
+
             }
         }
         return orig.Invoke(plr, Source, Damage, hitDirection, pvp, quiet, Crit, cooldownCounter, dodgeable);
@@ -210,40 +227,57 @@ public class GodCheck : TerrariaPlugin
             return;
         }
 
-        var data = Data.player.FirstOrDefault(x => x.Name == args.Player.name);
+        var plr = args.Player;
+        if (plr == null) return;
+
+        var data = Data.player.FirstOrDefault(x => x.Name == plr.name);
+
         if (data != null && args.Npc.active)
         {
             if (args.Npc.boss) //是BOSS
             {
                 // 与BOSS保持10格范围内 这里我加了个时间限制，对于无限血进程0无法检出它是否无敌，让它先过0再进2检防御和无限血
-                if (Tool.BossRange(args.Player, args.Npc) && (DateTime.UtcNow - data.StrikeBoss).TotalSeconds > Config.StrikeBoss)
+                if (Tool.BossRange(plr, args.Npc) && (DateTime.UtcNow - data.StrikeBoss).TotalSeconds > Config.StrikeBoss)
                 {
                     if (data.Progress == 2)
                     {
                         data.Progress = 0;
-                        data.StrikeBoss = DateTime.UtcNow;
-                    }
-                    else
-                    {
-                        data.Progress = 2;
                         data.StrikeBoss = DateTime.UtcNow;
                     }
                 }
+
+                // 玩家与NPC距离在2格内,超过3秒 用于判断无限闪避
+                else if (Tool.NPCRange(args.Player, args.Npc))
+                {
+                    data.NPCRange = true; //距离过近击中NPC标识
+                    data.NpcName = args.Npc.FullName; //获取击中NPC名字
+                }
             }
 
+            //不是BOSS 
             else
             {
-                if ((DateTime.UtcNow - data.StrikeTimer).TotalSeconds > Config.StrikeTimer)//不是BOSS
+                //时间到了再检
+                if ((DateTime.UtcNow - data.StrikeTimer).TotalSeconds > Config.StrikeTimer)
                 {
                     if (data.Progress == 2)
                     {
                         data.Progress = 0;
                         data.StrikeTimer = DateTime.UtcNow;
                     }
-                    else
+                }
+
+                //不是城镇NPC 假人 雕像怪  用于判断无限闪避
+                if (!args.Npc.townNPC && args.Npc.netID != 488 && !args.Npc.SpawnedFromStatue)
+                {
+                    if (data.Progress == 2)
                     {
-                        data.Progress = 2;
-                        data.StrikeTimer = DateTime.UtcNow;
+                        // 玩家与NPC距离在2格内,超过3秒
+                        if (Tool.NPCRange(args.Player, args.Npc))
+                        {
+                            data.NPCRange = true; //距离过近击中NPC标识
+                            data.NpcName = args.Npc.FullName; //获取击中NPC名字
+                        }
                     }
                 }
             }
@@ -253,26 +287,31 @@ public class GodCheck : TerrariaPlugin
 
     #region NPC死亡事件 自动计算进度免伤率
     internal static Dictionary<int, HashSet<int>> BossDowned = new Dictionary<int, HashSet<int>>();
-    private void KillItem(NpcKilledEventArgs args)
+    private void NpcKilled(NpcKilledEventArgs args)
     {
         if (args.npc == null || !Config.Enabled) return;
 
+        //循环遍历进度免伤表
         foreach (var npc in Config.BossList)
         {
+            //如果是免伤表里的NPC
             if (npc.ID.Contains(args.npc.netID))
             {
+                //不在死亡记录里
                 if (!BossDowned.ContainsKey(npc.ID.First()))
                 {
+                    //给它加个哈希
                     BossDowned[npc.ID.First()] = new HashSet<int>();
-                    npc.Enabled = true;
+                    npc.Enabled = true; //打开对应的死亡标识
                     Config.Write();
                 }
             }
         }
 
-        //月总死亡 关闭所有进度免伤的开关
-        if (args.npc.netID == Config.ResetBossListNPCID) 
+        //月总死亡 
+        if (args.npc.netID == Config.ResetBossListNPCID)
         {
+            //关闭所有进度免伤的开关
             for (int i = 0; i < Config.BossList.Count; i++)
             {
                 if (Config.BossList[i].Enabled)
@@ -310,8 +349,7 @@ public class GodCheck : TerrariaPlugin
             var MaxLife = Reader.ReadInt16();
 
             var now = DateTime.UtcNow; //初始化现在时间
-            var LastTimer = 0.0; //初始化过去的时间，
-
+            var LastTimer = 0.0; //初始化过去检查无敌的时间
             if (data.CheckGodTimer != default) //检查无敌时间不为空
             {
                 //过去时间 = 现在-检查无敌时间
@@ -328,7 +366,6 @@ public class GodCheck : TerrariaPlugin
             if (data.Progress == 1)
             {
                 Progress_1(plr, data, Life, LastTimer);
-                return;
             }
 
             // 进程2 对受伤与血量溢出 BOSS战时无伤的合理判断...
@@ -357,9 +394,24 @@ public class GodCheck : TerrariaPlugin
         else if (args.MsgID == PacketTypes.PlayerHealOther)
         {
             using var Reader3 = new BinaryReader(new MemoryStream(args.Msg.readBuffer, args.Index, args.Length));
-            var heal = Reader3.ReadInt16() / 256;
+            var heal2 = Reader3.ReadInt16() / 256;
 
-            Tool.Heal(plr, data, heal);
+            Tool.Heal(plr, data, heal2);
+            return;
+        }
+
+        //玩家闪避
+        else if (args.MsgID == PacketTypes.PlayerDodge)
+        {
+            using var Reader = new BinaryReader(new MemoryStream(args.Msg.readBuffer, args.Index, args.Length));
+            var Dodge = Reader.ReadInt16() / 256;
+
+            if (Config.NPCRangeEnabled && data.NPCRange) //与怪物距离过近
+                data.Dodge = true; //用于辅助判断无限闪避用的标识
+
+            if (Config.MonDodge) //播报玩家闪避
+                Tool.Dodge(plr, data, Dodge);
+
             return;
         }
     }
@@ -375,7 +427,6 @@ public class GodCheck : TerrariaPlugin
             data.LastLife = Life; //上次记录生命 为当前生命
             data.Life = Life; //记录生命 为当前生命
             data.Spawn = false; //关闭重生标识
-            data.HealValue = 0; //重置治疗量
             return;
         }
 
@@ -408,8 +459,11 @@ public class GodCheck : TerrariaPlugin
     private static void Progress_1(TSPlayer plr, MyData.PlayerData? data, short Life, double LastTimer)
     {
         // 1.5秒后 当前生命值 - 治疗量 超过历史记录生命，视为:不会受伤
-        if ((Life - data.HealValue) >= data.LastLife && LastTimer > 1.5)
+        if ((Life - data.TotalHeal) >= data.LastLife && LastTimer > 1.5)
         {
+            data.MissCount++; // 增加违规次数,
+            data.Progress = 0; //回到进程0再来
+
             if (Config.MonGod) //播报检查：检查无敌中
             {
                 plr.SendMessage($"[未通过检查]玩家:[c/1989BB:{plr.Name}] 治疗前生命:[c/6DD463:{Life - data.HealValue}] > " +
@@ -418,30 +472,30 @@ public class GodCheck : TerrariaPlugin
                 TShock.Log.ConsoleInfo($"[未通过检查]玩家:{plr.Name} 治疗前生命:{Life - data.HealValue} > " +
                 $"{data.LastLife} 违规:{data.MissCount} 间隔:{LastTimer}", 237, 234, 152);
             }
-
-            data.MissCount++; // 增加违规次数,
-            data.Progress = 0; //回到进程0再来
-            data.HealValue = 0; //重置治疗量
             return;
         }
 
         //1.5秒后计算 生命-治疗量 少于之前记录生命 视为:受伤通过检查
-        else if ((Life - data.HealValue) < data.LastLife && LastTimer > 1.5)
+        else if ((Life - data.TotalHeal) < data.LastLife && LastTimer > 1.5)
         {
             plr.Heal(50); //回血
+            data.MissCount = Math.Max(0, data.MissCount - 1);  //减少违规次数
+            data.Progress = 2;  //进入进程2 检查受伤详情
             if (Config.MonGod) //播报检查：进入进程2
             {
-                plr.SendMessage($"[通过检查]玩家:[c/1989BB:{plr.Name}] 治疗前生命:[c/6DD463:{Life - data.HealValue}] < " +
+                plr.SendMessage($"[通过检查]玩家:[c/1989BB:{plr.Name}] 治疗前生命:[c/6DD463:{Life - data.TotalHeal}] < " +
                 $"{data.LastLife} 违规:[c/9D9EE7:{data.MissCount}] 间隔:{LastTimer}", 237, 234, 152);
 
-                TShock.Log.ConsoleInfo($"[通过检查]玩家:{plr.Name} 治疗前生命:{Life - data.HealValue} < " +
+                TShock.Log.ConsoleInfo($"[通过检查]玩家:{plr.Name} 治疗前生命:{Life - data.TotalHeal} < " +
                 $"{data.LastLife} 违规:{data.MissCount} 间隔:{LastTimer}", 237, 234, 152);
             }
-
-            data.MissCount = Math.Max(0, data.MissCount - 1);  //减少违规次数
-            data.HealValue = 0; //重置治疗量
-            data.Progress = 2;  //进入进程2 检查受伤详情
             return;
+        }
+
+        //如果玩家死亡 违规数清空
+        if (plr.Dead)
+        {
+            data.MissCount = 0;
         }
 
         // 违规次数达标 惩罚
@@ -455,6 +509,8 @@ public class GodCheck : TerrariaPlugin
         // 更新上次记录血量 返回
         data.LastLife = data.Life;
         data.Life = Life;
+        data.TotalHeal = 0; //重置统计治疗量
+        return;
     }
     #endregion
 
@@ -484,7 +540,53 @@ public class GodCheck : TerrariaPlugin
         {
             CheckLifeMax(plr, data, MaxLife);
         }
+
+        //当检查配置中的闪避检查与小怪距离过近的标识开启时
+        if (Config.NPCRangeEnabled && data.NPCRange)
+        {
+            CheckDodge(plr, data, Life, MaxLife);
+            return;
+        }
     }
+    #endregion
+
+    #region 检查闪避 只在与怪物距离过近、满血时触发
+    private static void CheckDodge(TSPlayer plr, MyData.PlayerData? data, short Life, short MaxLife)
+    {
+        if (Life == MaxLife) //当前血量没有变化
+        {
+            data.MissCount++; // 增加违规次数,
+
+            if (Config.MonDodge) //播报玩家闪避
+                plr.SendMessage($"[未通过检查]玩家:[c/1989BB:{plr.Name}] 违规:[c/9D9EE7:{data.MissCount}]", 237, 234, 152);
+        }
+        else if (data.Hurt2 || data.Dodge) //受伤或闪避标识开启
+        {
+            data.MissCount = Math.Max(0, data.MissCount - 1);  //减少违规次数
+
+            if (Config.MonDodge) //播报玩家闪避
+                plr.SendMessage($"[通过检查]玩家:[c/1989BB:{plr.Name}] 违规:[c/9D9EE7:{data.MissCount}]", 237, 234, 152);
+        }
+
+        //如果玩家死亡 违规数清空
+        if (plr.Dead)
+        {
+            data.MissCount = 0;
+        }
+
+        // 违规次数达标 惩罚
+        if (data.MissCount >= Config.TrialsCount)
+        {
+            var text = $"因无限闪避与{data.NpcName}距离{Config.NPCRange}格内未受伤";
+            Tool.Pun(plr, data, text);
+            return;
+        }
+
+        data.NPCRange = false;
+        data.Hurt2 = false;
+        data.Dodge = false;
+        return;
+    } 
     #endregion
 
     #region 检测无限血与修改防御等方法
@@ -499,7 +601,7 @@ public class GodCheck : TerrariaPlugin
             return; //返回，如果玩家修改了防御 受伤值就不准了 只能靠比对血量变化
         }
 
-        // 确保预期生命不为0
+        // 确保预期生命不为负数
         if (ExpectLife < 0)
         {
             ExpectLife = 0;
@@ -509,24 +611,29 @@ public class GodCheck : TerrariaPlugin
         // 播报受伤血量变化
         if (Config.MonHurtLife)
         {
-            plr.SendMessage($"玩家:[c/1989BB:{plr.Name}] 治疗前生命:[c/6DD463:{Life - data.HealValue}] " +
+            plr.SendMessage($"玩家:[c/1989BB:{plr.Name}] 治疗前生命:[c/6DD463:{Life - data.TotalHeal}] " +
             $"预期血量:[c/D48FAF:{ExpectLife}] 应受伤:[c/F25156:{data.RealDamage}] 违规数:[c/9D9EE7:{data.MissCount}]", 237, 234, 152);
 
-            TShock.Log.ConsoleInfo($"玩家:{plr.Name} 治疗前生命:{Life - data.HealValue} " +
+            TShock.Log.ConsoleInfo($"玩家:{plr.Name} 治疗前生命:{Life - data.TotalHeal} " +
             $"预期血量:{ExpectLife} 应受伤:{data.RealDamage} 违规数:{data.MissCount}", 237, 234, 152);
         }
 
         // 当前血量 - 治疗量 超过预期生命
-        if ((Life - data.HealValue) > ExpectLife)
+        if ((Life - data.TotalHeal) > ExpectLife)
         {
             data.MissCount++; //增加违规数
-            data.HealValue = 0; //重置治疗量
         }
         else //没超过
         {
             //减少违规数
             data.MissCount = Math.Max(0, data.MissCount - 1);
-            data.HealValue = 0; //重置治疗量
+            return;
+        }
+
+        //如果玩家死亡 违规数清空
+        if (plr.Dead)
+        {
+            data.MissCount = 0;
         }
 
         // 违规次数达标 开罚
@@ -538,6 +645,7 @@ public class GodCheck : TerrariaPlugin
         }
 
         data.Hurt = false; // 关闭受伤标识，等待下次伤害回馈
+        data.TotalHeal = 0; //重置统计治疗量
         return;
     }
     #endregion
@@ -576,7 +684,7 @@ public class GodCheck : TerrariaPlugin
             Tool.Pun(plr, data, text);
             return;
         }
-    } 
+    }
     #endregion
 
 }
