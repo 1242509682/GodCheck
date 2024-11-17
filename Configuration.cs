@@ -21,6 +21,9 @@ namespace GodCheck
         [JsonProperty("检查无敌的Buff时长", Order = -11)]
         public int BuffTimer { get; set; } = 30;
 
+        [JsonProperty("通过检查后的回复生命", Order = -11)]
+        public int heal { get; set; } = 60;
+
         [JsonProperty("伤怪触发检查无敌秒数", Order = -10)]
         public double StrikeTimer = 300.0;
 

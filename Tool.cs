@@ -153,12 +153,6 @@ namespace GodCheck
                         {
                             data.MissCount++;
                         }
-
-                        //如果玩家死亡 违规数清空
-                        if (plr.Dead)
-                        {
-                            data.MissCount = 0;
-                        }
                     }
                 }
 

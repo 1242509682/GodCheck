@@ -11,7 +11,7 @@ public class GodCheck : TerrariaPlugin
     #region 插件信息
     public override string Name => "无敌检测";
     public override string Author => "羽学";
-    public override Version Version => new Version(1, 0, 3);
+    public override Version Version => new Version(1, 0, 4);
     public override string Description => "涡轮增压不蒸鸭";
     #endregion
 
@@ -96,6 +96,7 @@ public class GodCheck : TerrariaPlugin
                 data.TotalHeal = 0;
                 data.HealTimer = default;
                 data.HealTimer2 = default;
+                return;
             }
         }
     }
@@ -119,7 +120,12 @@ public class GodCheck : TerrariaPlugin
             data.TotalHeal = 0;
             data.HealTimer = default;
             data.HealTimer2 = default;
-            data.Progress = 0;
+
+            if (data.Progress == 2) //避免与刚加入时的进程冲突
+            {
+                data.Progress = 0;
+                return;
+            }
         }
     }
     #endregion
@@ -213,6 +219,7 @@ public class GodCheck : TerrariaPlugin
                     data.Progress = 0;
                     data.StrikeTimer = DateTime.UtcNow;
                     data.StrikeBoss = DateTime.UtcNow;
+                    return;
                 }
             }
         }
@@ -243,6 +250,7 @@ public class GodCheck : TerrariaPlugin
                     {
                         data.Progress = 0;
                         data.StrikeBoss = DateTime.UtcNow;
+                        return;
                     }
                 }
 
@@ -251,6 +259,7 @@ public class GodCheck : TerrariaPlugin
                 {
                     data.NPCRange = true; //距离过近击中NPC标识
                     data.NpcName = args.Npc.FullName; //获取击中NPC名字
+                    return;
                 }
             }
 
@@ -264,6 +273,7 @@ public class GodCheck : TerrariaPlugin
                     {
                         data.Progress = 0;
                         data.StrikeTimer = DateTime.UtcNow;
+                        return;
                     }
                 }
 
@@ -277,6 +287,7 @@ public class GodCheck : TerrariaPlugin
                         {
                             data.NPCRange = true; //距离过近击中NPC标识
                             data.NpcName = args.Npc.FullName; //获取击中NPC名字
+                            return;
                         }
                     }
                 }
@@ -338,6 +349,14 @@ public class GodCheck : TerrariaPlugin
         if (data == null || plr.IsBeingDisabled())
         {
             return;
+        }
+
+        //如果玩家死亡 违规、治疗数清空
+        if (plr.Dead)
+        {
+            data.MissCount = 0;
+            data.TotalHeal = 0;
+            data.HealValue = 0;
         }
 
         // 当玩家生命变化时触发
@@ -422,12 +441,11 @@ public class GodCheck : TerrariaPlugin
     {
         if (data == null) return;
 
-        if (data.Spawn) //刚重生 初始化一下血量
+        if (data.Spawn) //初始化
         {
             data.LastLife = Life; //上次记录生命 为当前生命
             data.Life = Life; //记录生命 为当前生命
             data.Spawn = false; //关闭重生标识
-            return;
         }
 
         else //初始化后
@@ -458,15 +476,22 @@ public class GodCheck : TerrariaPlugin
     #region 进程1 检测无敌 惩罚 放行进程2
     private static void Progress_1(TSPlayer plr, MyData.PlayerData? data, short Life, double LastTimer)
     {
-        // 1.5秒后 当前生命值 - 治疗量 超过历史记录生命，视为:不会受伤
-        if ((Life - data.TotalHeal) >= data.LastLife && LastTimer > 1.5)
+        //确保上次血量纪录不为0
+        if (data.LastLife == 0)
+        {
+            data.Progress = 0; //回到进程0再来
+            return;
+        }
+
+        //0.5秒后 当前生命值 - 治疗量 超过历史记录生命，视为:不会受伤
+        if ((Life - data.TotalHeal) >= data.LastLife && LastTimer > 0.5)
         {
             data.MissCount++; // 增加违规次数,
             data.Progress = 0; //回到进程0再来
 
             if (Config.MonGod) //播报检查：检查无敌中
             {
-                plr.SendMessage($"[未通过检查]玩家:[c/1989BB:{plr.Name}] 治疗前生命:[c/6DD463:{Life - data.HealValue}] > " +
+                plr.SendMessage($"[未通过检查]玩家:[c/1989BB:{plr.Name}] 治疗前生命:[c/6DD463:{Life - data.HealValue}] >= " +
                 $"{data.LastLife} 违规:[c/9D9EE7:{data.MissCount}] 间隔:{LastTimer}", 237, 234, 152);
 
                 TShock.Log.ConsoleInfo($"[未通过检查]玩家:{plr.Name} 治疗前生命:{Life - data.HealValue} > " +
@@ -475,10 +500,10 @@ public class GodCheck : TerrariaPlugin
             return;
         }
 
-        //1.5秒后计算 生命-治疗量 少于之前记录生命 视为:受伤通过检查
-        else if ((Life - data.TotalHeal) < data.LastLife && LastTimer > 1.5)
+        //0.5秒后计算 生命-治疗量 少于之前记录生命 视为:受伤通过检查
+        else if ((Life - data.TotalHeal) < data.LastLife && LastTimer > 0.5)
         {
-            plr.Heal(50); //回血
+            plr.Heal(Config.heal); //回血
             data.MissCount = Math.Max(0, data.MissCount - 1);  //减少违规次数
             data.Progress = 2;  //进入进程2 检查受伤详情
             if (Config.MonGod) //播报检查：进入进程2
@@ -490,12 +515,6 @@ public class GodCheck : TerrariaPlugin
                 $"{data.LastLife} 违规:{data.MissCount} 间隔:{LastTimer}", 237, 234, 152);
             }
             return;
-        }
-
-        //如果玩家死亡 违规数清空
-        if (plr.Dead)
-        {
-            data.MissCount = 0;
         }
 
         // 违规次数达标 惩罚
@@ -545,6 +564,7 @@ public class GodCheck : TerrariaPlugin
         if (Config.NPCRangeEnabled && data.NPCRange)
         {
             CheckDodge(plr, data, Life, MaxLife);
+            data.NPCRange = false;
             return;
         }
     }
@@ -558,20 +578,16 @@ public class GodCheck : TerrariaPlugin
             data.MissCount++; // 增加违规次数,
 
             if (Config.MonDodge) //播报玩家闪避
-                plr.SendMessage($"[未通过检查]玩家:[c/1989BB:{plr.Name}] 违规:[c/9D9EE7:{data.MissCount}]", 237, 234, 152);
+                plr.SendMessage($"[未通过检查]玩家:[c/1989BB:{plr.Name}]与{data.NpcName}距离[c/1989BB:{Config.NPCRange}格]内未受伤 违规:[c/9D9EE7:{data.MissCount}]", 237, 234, 152);
         }
-        else if (data.Hurt2 || data.Dodge) //受伤或闪避标识开启
+        else if (data.Hurt2 || data.Dodge || data.HealValue > 0) //受伤或闪避标识开启
         {
             data.MissCount = Math.Max(0, data.MissCount - 1);  //减少违规次数
 
             if (Config.MonDodge) //播报玩家闪避
-                plr.SendMessage($"[通过检查]玩家:[c/1989BB:{plr.Name}] 违规:[c/9D9EE7:{data.MissCount}]", 237, 234, 152);
-        }
+                plr.SendMessage($"[通过检查]玩家:[c/1989BB:{plr.Name}]与{data.NpcName}距离[c/1989BB:{Config.NPCRange}格]内受伤 违规:[c/9D9EE7:{data.MissCount}]", 237, 234, 152);
 
-        //如果玩家死亡 违规数清空
-        if (plr.Dead)
-        {
-            data.MissCount = 0;
+            return;
         }
 
         // 违规次数达标 惩罚
@@ -582,11 +598,11 @@ public class GodCheck : TerrariaPlugin
             return;
         }
 
-        data.NPCRange = false;
         data.Hurt2 = false;
         data.Dodge = false;
+        data.HealValue = 0;
         return;
-    } 
+    }
     #endregion
 
     #region 检测无限血与修改防御等方法
@@ -628,12 +644,6 @@ public class GodCheck : TerrariaPlugin
             //减少违规数
             data.MissCount = Math.Max(0, data.MissCount - 1);
             return;
-        }
-
-        //如果玩家死亡 违规数清空
-        if (plr.Dead)
-        {
-            data.MissCount = 0;
         }
 
         // 违规次数达标 开罚
