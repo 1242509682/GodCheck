@@ -48,20 +48,19 @@ namespace GodCheck
             {
                 //自定义封禁时间
                 plr.Disconnect($"你已被封禁！原因：{text}。");
-                TSPlayer.All.SendMessage($"{plr.Name} 已被封禁！原因：{text}。", 247, 242, 168);
+                TShock.Utils.Broadcast($"{plr.Name} 已被封禁！原因：{text}。", 247, 242, 168);
 
                 foreach (var ban in Config.Banlist)
                 {
                     Ban.AddBan(plr, $"{text}", ban);
                 }
-
             }
 
             if (Config.Kick)
             {
                 plr.Disconnect($"{plr.Name} 已被踢出！原因：{text}。");
                 data.MissCount = 0;
-                TSPlayer.All.SendMessage($"{plr.Name} 已被踢出！原因：{text}。", 247, 242, 168);
+                TShock.Utils.Broadcast($"{plr.Name} 已被踢出！原因：{text}。", 247, 242, 168);
             }
 
             if (Config.PunBuff && Config.BuffID != null)
@@ -96,8 +95,7 @@ namespace GodCheck
         {
             if (data == null) return;
 
-            // 更新累计治疗量
-            data.TotalHeal += heal;
+            data.TotalHeal += heal; // 更新累计治疗量
             data.HealValue = heal; // 存储治疗值
 
             var now = DateTime.UtcNow;
@@ -119,14 +117,14 @@ namespace GodCheck
             //播报玩家回血,过滤低于10点的回复量
             if (Config.MonHeal && data.HealValue >= Config.MonHealValue)
             {
-                TShock.Utils.Broadcast($"玩家:[c/1989BB:{plr.Name}] 治疗:[c/6DD463:{heal}] 统计:[c/1989BB:{data.TotalHeal}] 间隔:[c/F25156:{last}]秒", 237, 234, 152);
+                TShock.Utils.Broadcast($"[c/25CE9E:参考 |] 玩家:[c/1989BB:{plr.Name}] 治疗:[c/6DD463:{heal}] 统计:[c/1989BB:{data.TotalHeal}] 间隔:[c/F25156:{last}]秒", 237, 234, 152);
             }
 
             // 记录本次治疗时间
             data.HealTimer = now;
 
             //检查治疗量配置开关,治疗量超过50点的时间间隔不为0
-            if (Config.CheckHeal && heal >= Config.HealValue && last2 != 0f) 
+            if (Config.CheckHeal && heal >= Config.HealValue && last2 != 0f)
             {
                 //间隔少于45秒
                 if (last2 <= Config.HealTimer)
@@ -143,17 +141,33 @@ namespace GodCheck
                             if (!NurseRange(plr, npc))
                             {
                                 data.MissCount++;
+                                if (Config.MonHeal)
+                                    TShock.Utils.Broadcast($"[c/E62942:未过 |] 玩家:[c/1989BB:{plr.Name}] 治疗:[c/6DD463:{heal}] 违规:[c/9D9EE7:{data.MissCount}] 间隔:[c/F25156:{last2}]秒 ", 237, 234, 152);
+                                return;
                             }
                             else //在范围内 减少违规数
                             {
                                 data.MissCount = Math.Max(0, data.MissCount - 1);
+                                if (Config.MonHeal)
+                                    TShock.Utils.Broadcast($"[c/57D726:通过 |] 玩家:[c/1989BB:{plr.Name}] 治疗:[c/6DD463:{heal}] 违规:[c/9D9EE7:{data.MissCount}] 间隔:[c/F25156:{last2}]秒 ", 237, 234, 152);
+                                return;
                             }
                         }
                         else  //护士不存在 不需要考虑范围 直接加违规数
                         {
                             data.MissCount++;
+                            if (Config.MonHeal)
+                                TShock.Utils.Broadcast($"[c/E62942:未过 |] 玩家:[c/1989BB:{plr.Name}] 治疗:[c/6DD463:{heal}] 违规:[c/9D9EE7:{data.MissCount}] 间隔:[c/F25156:{last2}]秒 ", 237, 234, 152);
+                            return;
                         }
                     }
+                }
+                else //治疗时间合理 减少违规数
+                {
+                    data.MissCount = Math.Max(0, data.MissCount - 1);
+                    if (Config.MonHeal)
+                        TShock.Utils.Broadcast($"[c/57D726:通过 |] 玩家:[c/1989BB:{plr.Name}] 治疗:[c/6DD463:{heal}] 违规:[c/9D9EE7:{data.MissCount}] 间隔:[c/F25156:{last2}]秒 ", 237, 234, 152);
+                    return;
                 }
 
                 if (data.MissCount >= Config.TrialsCount)
@@ -247,20 +261,19 @@ namespace GodCheck
 
             if (Dodge == 1) //忍者大师
             {
-                TShock.Utils.Broadcast($"玩家:[c/1989BB:{plr.Name}] 触发:[c/6DD463:黑腰带] 上次闪避:[c/F25156:{last}]秒", 237, 234, 152);
+                TShock.Utils.Broadcast($"[c/57D726:通过 |] 玩家:[c/1989BB:{plr.Name}] 触发:[c/6DD463:黑腰带] 违规数:[c/9D9EE7:{data.MissCount}] 上次闪避:[c/F25156:{last}]秒", 237, 234, 152);
             }
 
             else if (Dodge == 2) //神圣套
             {
-                TShock.Utils.Broadcast($"玩家:[c/1989BB:{plr.Name}] 触发:[c/6DD463:神圣套] 上次闪避:[c/F25156:{last}]秒", 237, 234, 152);
+                TShock.Utils.Broadcast($"[c/57D726:通过 |] 玩家:[c/1989BB:{plr.Name}] 触发:[c/6DD463:神圣套] 违规数:[c/9D9EE7:{data.MissCount}] 上次闪避:[c/F25156:{last}]秒", 237, 234, 152);
             }
 
             else if (Dodge == 4) //混乱之脑
             {
-                TShock.Utils.Broadcast($"玩家:[c/1989BB:{plr.Name}] 触发:[c/6DD463:混乱之脑] 上次闪避:[c/F25156:{last}]秒", 237, 234, 152);
+                TShock.Utils.Broadcast($"[c/57D726:通过 |] 玩家:[c/1989BB:{plr.Name}] 触发:[c/6DD463:混乱之脑] 违规数:[c/9D9EE7:{data.MissCount}] 上次闪避:[c/F25156:{last}]秒", 237, 234, 152);
             }
 
-           
             data.DodgeTimer = now; // 记录本次治疗时间
         }
         #endregion

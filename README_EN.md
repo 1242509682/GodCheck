@@ -9,6 +9,11 @@
 ## Update Log
 
 ```
+v1.0.5
+Reducing Misjudgment Rate:
+When health is between 30-50, the invincibility check will not indefinitely increase the violation count; instead, it will first restore before checking again.
+Improved the broadcast check prompt messages.
+
 v1.0.4
 Reduced misjudgment rate:
 - Fixed the issue where healing amount and last health were not reset upon respawn.

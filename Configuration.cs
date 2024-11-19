@@ -13,7 +13,7 @@ namespace GodCheck
         public bool MonGod { get; set; } = true;
 
         [JsonProperty("触发惩罚违规次数", Order = -13)]
-        public int TrialsCount = 2;
+        public int TrialsCount = 4;
 
         [JsonProperty("检查无敌玩家Buff", Order = -12)]
         public int[] BuffType = new int[] { 20, 39, 68 };
@@ -28,7 +28,7 @@ namespace GodCheck
         public double StrikeTimer = 300.0;
 
         [JsonProperty("BOSS战的检查无敌秒数", Order = -10)]
-        public double StrikeBoss = 30.0;
+        public double StrikeBoss = 60.0;
 
         [JsonProperty("靠近BOSS检查无敌格数", Order = -10)]
         public double BossRange { get; set; } = 60.0;
@@ -85,7 +85,7 @@ namespace GodCheck
         public bool MonHeal { get; set; } = true;
 
         [JsonProperty("治疗低于多少不会播报", Order = 0)]
-        public int MonHealValue { get; set; } = 20;
+        public int MonHealValue { get; set; } = 50;
 
         [JsonProperty("惩罚血量上限增幅不合理", Order = 10)]
         public bool MaxLifeSpill = false;

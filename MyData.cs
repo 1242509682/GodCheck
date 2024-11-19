@@ -56,6 +56,9 @@ namespace GodCheck
             //闪避标识
             public bool Dodge { get; set; }
 
+            //残血标识
+            public bool Residual { get; set; }
+
             //上次闪避时间
             public DateTime DodgeTimer { get; set; }
 
