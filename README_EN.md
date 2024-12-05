@@ -9,6 +9,9 @@
 ## Update Log
 
 ```
+v1.0.6
+Added the 'IgnoreUseItem' configuration item to reduce misjudgment rate
+
 v1.0.5
 Reducing Misjudgment Rate:
 When health is between 30-50, the invincibility check will not indefinitely increase the violation count; instead, it will first restore before checking again.
@@ -63,7 +66,7 @@ Refactored the plugin from GK's 'Prevent Player Invincibility'.
 {
   "Main Plugin Switch": true,
   "Broadcast Invincibility Check": true,
-  "Violation Count to Trigger Punishment": 2,
+  "Violation Count to Trigger Punishment": 4,
   "Invincibility Buff Check": [
     20,
     39,
@@ -78,6 +81,9 @@ Refactored the plugin from GK's 'Prevent Player Invincibility'.
   "Grids to Check Dodging Near NPCs": 1.0,
   "Seconds to Check Dodging Near NPCs": 3.0,
   "Broadcast Player Dodging": true,
+  "Ignore Use Item": [
+    1326
+  ],
   "Check Defense Modification": true,
   "Damage Below Which Is Not Considered a Violation": 20,
   "Global Immunity Rate": 0.0,

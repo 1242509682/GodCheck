@@ -45,6 +45,9 @@ namespace GodCheck
         [JsonProperty("播报玩家闪避", Order = -9)]
         public bool MonDodge { get; set; } = false;
 
+        [JsonProperty("忽略使用物品", Order = -8)]
+        public int[] IgnoreUseItem { get; set; } = new int[] { 1326 };
+
         [JsonProperty("检查修改防御", Order = -8)]
         public bool CheckDefense { get; set; } = true;
 

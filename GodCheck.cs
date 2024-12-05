@@ -11,7 +11,7 @@ public class GodCheck : TerrariaPlugin
     #region 插件信息
     public override string Name => "无敌检测";
     public override string Author => "羽学";
-    public override Version Version => new Version(1, 0, 5);
+    public override Version Version => new Version(1, 0, 6);
     public override string Description => "涡轮增压不蒸鸭";
     #endregion
 
@@ -540,7 +540,14 @@ public class GodCheck : TerrariaPlugin
     #region 进程2 检测血量负值与上限 判断受伤是否来源于无限血与修改防御等
     private static void Progress_2(TSPlayer plr, MyData.PlayerData? data, short Life, short MaxLife)
     {
-        // 老外要求加的 血量低于0 触发惩罚
+        //忽略正在使用的物品
+        var hasItem = plr.TPlayer.inventory.Take(50).Any(x => x != null && Config.IgnoreUseItem.Contains(x.type));
+        if (plr.TPlayer.controlUseItem && hasItem && Config.IgnoreUseItem.Contains(plr.SelectedItem.type))
+        {
+            return;
+        }
+
+        // 老外要求加的 血量低于0 触发惩罚 并排除使用和谐法杖
         if (Life < 0 || data.Life < 0)
         {
             var text = $"因为生命负数 {Life} < 0 ";
