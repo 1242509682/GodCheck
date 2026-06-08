@@ -1,3 +1,8 @@
-copy bin\Debug\net6.0\GodCheck.dll C:\Users\羽学\Desktop\Beta\ServerPlugins
-del C:\Users\羽学\Desktop\Beta\tshock\无敌检测.json
+copy bin\debug\net9.0\GodCheck.dll C:\Users\羽学\Desktop\Beta\ServerPlugins
+copy bin\debug\net9.0\GodCheck.pdb C:\Users\羽学\Desktop\Beta\ServerPlugins
+del "C:\Users\羽学\Desktop\Beta\tshock\无敌检测.json"
 taskkill /F /IM TShock.Server.exe
+
+	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
+	  <Exec Command="copy bin\debug\net9.0\GodCheck.dll C:\Users\羽学\Desktop\Beta\ServerPlugins&#xD;&#xA;copy bin\debug\net9.0\GodCheck.pdb C:\Users\羽学\Desktop\Beta\ServerPlugins&#xD;&#xA;del &quot;C:\Users\羽学\Desktop\Beta\tshock\无敌检测.json&quot;&#xD;&#xA;taskkill /F /IM TShock.Server.exe" />
+	</Target>
