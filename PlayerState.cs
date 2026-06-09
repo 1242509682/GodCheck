@@ -13,6 +13,8 @@ internal class PlayerState
         public int Life { get; set; } = life;   // 当前生命
         public int Pun { get; set; } = 0;     // 违规次数
         public DateTime CheckTime { get; set; } = time;  // 违规日期
+        public DateTime LastHurtTime { get; set; } = DateTime.MinValue; // 受伤时间
+        public Queue<DateTime> HurtTamps { get; set; } = new(); // 存储最近受伤时间戳的队列
     }
     #endregion
 

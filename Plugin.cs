@@ -17,7 +17,7 @@ public class Plugin(Main game) : TerrariaPlugin(game)
     public static string PluginName => "无敌检测";
     public override string Name => PluginName;
     public override string Author => "羽学";
-    public override Version Version => new(2, 0, 0);
+    public override Version Version => new(2, 0, 1);
     public override string Description => "使用实体碰撞箱来检测玩家无敌状态";
     #endregion
 
@@ -92,13 +92,16 @@ public class Plugin(Main game) : TerrariaPlugin(game)
         var plr = TShock.Players.FirstOrDefault(p => p != null && p.Active && p.TPlayer.Hitbox.Intersects(npc.Hitbox));
 
         // 排除无效玩家 、服务器开启的无敌、 拥有皇家凝胶
-        if (plr == null || !plr.Active || plr.HasPermission(MyCmd.prem) || plr.GodMode || plr.TPlayer.npcTypeNoAggro[npc.type]) return;
+        if (plr == null || !plr.Active || plr.HasPermission(MyCmd.prem) ||
+            plr.GodMode || plr.TPlayer.npcTypeNoAggro[npc.type]) return;
 
         var data = GetData(plr.Name);
         if (data == null) return;
 
+        // 预计算 忽略伤害
+        int dmg = (int)Main.CalculateDamagePlayersTake(npc.damage, plr.TPlayer.statDefense);
         if (plr.TPlayer.Hitbox.Intersects(npc.Hitbox))
-            PunMess(plr, data);
+            PunMess(plr, data, dmg);
     }
 
     private void OnProjAI(ProjectileAiUpdateEventArgs args)
@@ -124,8 +127,10 @@ public class Plugin(Main game) : TerrariaPlugin(game)
             if (plr.TPlayer.npcTypeNoAggro[npc.type]) return;
         }
 
+        // 预计算伤害
+        int dmg = (int)Main.CalculateDamagePlayersTake(proj.damage, plr.TPlayer.statDefense);
         if (plr.TPlayer.Hitbox.Intersects(proj.Hitbox))
-            PunMess(plr, data);
+            PunMess(plr, data, dmg);
     }
 
     // 可以被攻击受伤则返回
@@ -134,70 +139,59 @@ public class Plugin(Main game) : TerrariaPlugin(game)
         if (!Config.Enabled) return;
 
         var plr = e.Player;
-        if (plr == null || !plr.Active || plr.HasPermission(MyCmd.prem) ||  plr.GodMode) return;
-
-        var src = e.PlayerDeathReason;
-        if (!src.TryGetCausingEntity(out var ent) || ent == null) return;
+        if (plr == null || !plr.Active || plr.HasPermission(MyCmd.prem) || plr.GodMode) return;
 
         var data = GetData(plr.Name);
         if (data == null) return;
 
-        var npc = GetNPC(ent);
-        if (npc != null) return;
+        // 记录受伤时间
+        data.LastHurtTime = DateTime.UtcNow;
+        // 更新生命值记录（此处获取受伤后生命值）
+        data.Life = plr.TPlayer.statLife;
+        data.CheckTime = DateTime.UtcNow;
 
-        PunMess(plr, data);
-    }
-    #endregion
+        // --- 无敌帧检测 ---
+        var now = DateTime.UtcNow;
+        data.HurtTamps.Enqueue(now);
 
-    #region 获取NPC攻击方法
-    private static NPC? GetNPC(Entity ent)
-    {
-        NPC? npc = null;
+        // 清理超过 1 秒的记录
+        while (data.HurtTamps.Count > 0 &&
+              (now - data.HurtTamps.Peek()).TotalSeconds > 1.0)
+            data.HurtTamps.Dequeue();
 
-        if (ent is NPC n)
+        // 惩罚
+        if (data.Pun >= Config.PunCount)
         {
-            npc = n;
-        }
-        else if (ent is Projectile proj && proj.hostile)
-        {
-            if (!projMap.TryGetValue(proj.whoAmI, out int idx))
-                return null;
-
-            // 从预先生成的映射中查找发射该弹幕的 NPC
-            if (idx >= 0 && idx < Main.maxNPCs)
-                npc = Main.npc[idx];
+            Pun(plr, "刷无敌帧");
+            return;
         }
 
-        return npc;
+        // 每秒受伤4次 增加1次违规
+        if (data.HurtTamps.Count >= Config.MaxHurt)
+        {
+            data.Pun++;
+            Log($"【{PluginName}】 {plr.Name} 每秒受伤 {data.HurtTamps.Count} 次，恶意刷无敌帧！");
+        }
     }
     #endregion
 
     #region 预惩罚信息公告
-    private static void PunMess(TSPlayer plr, MyData data)
+    private static void PunMess(TSPlayer plr, MyData data, int dmg)
     {
+        var p = plr.TPlayer;
+
+        // 1. 无敌帧或闪避效果 → 不计违规
+        if (p.immune ||p.shadowDodge || p.onHitDodge)
+            return;
+
+        // 2. 最近0.5秒内刚受过伤 → 不计违规（保护正常玩家）
+        if ((DateTime.UtcNow - data.LastHurtTime).TotalSeconds < 0.5)
+            return;
+
+        // 惩罚
         if (data.Pun >= Config.PunCount)
         {
-            if (!Config.PunList.Contains(plr.Name))
-            {
-                if (!Config.Kick)
-                {
-                    PunTP.Add(plr);
-                    Log($"【{PluginName}】 {plr.Name} 已传送世界左上角!");
-                    Log($"请踢出该玩家: /kick {plr.Index}");
-                    Log($"移除惩罚名单: /pun {plr.Account.ID}");
-                }
-                else
-                {
-                    plr.Disconnect($"[{PluginName}] {plr.Name} 已被自动踢出！");
-                    Log($"【{PluginName}】 {plr.Name} 已被自动踢出！");
-                    Log($"移除惩罚名单: /pun {plr.Account.ID}");
-                }
-
-
-                Config.PunList.Add(plr.Name);
-                Config.Write();
-            }
-
+            Pun(plr,"无敌");
             return;
         }
 
@@ -205,10 +199,9 @@ public class Plugin(Main game) : TerrariaPlugin(game)
         var elapsed = (now - data.CheckTime).TotalSeconds;
         if (elapsed >= Config.CoolDown)
         {
-            var p = plr.TPlayer;
-            var life = plr.TPlayer.statLife;
-
-            if (data.Life == life || life < 0 || data.Life < 0)
+            // 无敌作弊判定：生命值未减少（应受伤而未受伤）
+            var life = p.statLife;
+            if ((life == data.Life && dmg > 0) || life < 0 || data.Life < 0)
             {
                 data.Pun++;
                 Log($"【{PluginName}】 {plr.Name} 违规 {data.Pun} 次 距离上次: {elapsed:F2}秒");
@@ -216,6 +209,29 @@ public class Plugin(Main game) : TerrariaPlugin(game)
 
             data.Life = life;
             data.CheckTime = now;
+        }
+    }
+
+    private static void Pun(TSPlayer plr,string? text = null)
+    {
+        if (!Config.PunList.Contains(plr.Name))
+        {
+            if (!Config.Kick)
+            {
+                PunTP.Add(plr);
+                Log($"【{PluginName}】 {plr.Name} 已传送世界左上角! 原因:{text}");
+                Log($"请踢出该玩家: /kick {plr.Index}");
+                Log($"移除惩罚名单: /pun {plr.Account.ID}");
+            }
+            else
+            {
+                plr.Disconnect($"[{PluginName}] {plr.Name} 已被自动踢出！原因:{text}");
+                Log($"【{PluginName}】 {plr.Name} 已被自动踢出！原因:{text}");
+                Log($"移除惩罚名单: /pun {plr.Account.ID}");
+            }
+
+            Config.PunList.Add(plr.Name);
+            Config.Write();
         }
     }
     #endregion

@@ -18,7 +18,9 @@ internal class Configuration
     public int PunCount { get; set; } = 3;
     [JsonProperty("自动踢出", Order = 4)]
     public bool Kick { get; set; } = false;
-    [JsonProperty("惩罚名单", Order = 5)]
+    [JsonProperty("每秒受伤", Order = 5)]
+    public int MaxHurt { get; set; } = 4;   // 超过此值视为恶意刷无敌帧
+    [JsonProperty("惩罚名单", Order = 6)]
     public List<string> PunList { get; set; } = new();
     #endregion
 
