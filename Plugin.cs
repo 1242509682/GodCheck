@@ -17,7 +17,7 @@ public class Plugin(Main game) : TerrariaPlugin(game)
     public static string PluginName => "无敌检测";
     public override string Name => PluginName;
     public override string Author => "羽学";
-    public override Version Version => new(2, 0, 1);
+    public override Version Version => new(2, 0, 2);
     public override string Description => "使用实体碰撞箱来检测玩家无敌状态";
     #endregion
 
@@ -98,8 +98,8 @@ public class Plugin(Main game) : TerrariaPlugin(game)
         var data = GetData(plr.Name);
         if (data == null) return;
 
-        // 预计算 忽略伤害
-        int dmg = (int)Main.CalculateDamagePlayersTake(npc.damage, plr.TPlayer.statDefense);
+        // 预计算伤害
+        int dmg = ExpDamage(plr.TPlayer, npc.damage);
         if (plr.TPlayer.Hitbox.Intersects(npc.Hitbox))
             PunMess(plr, data, dmg);
     }
@@ -128,7 +128,7 @@ public class Plugin(Main game) : TerrariaPlugin(game)
         }
 
         // 预计算伤害
-        int dmg = (int)Main.CalculateDamagePlayersTake(proj.damage, plr.TPlayer.statDefense);
+        int dmg = ExpDamage(plr.TPlayer, proj.damage);
         if (plr.TPlayer.Hitbox.Intersects(proj.Hitbox))
             PunMess(plr, data, dmg);
     }
@@ -144,9 +144,8 @@ public class Plugin(Main game) : TerrariaPlugin(game)
         var data = GetData(plr.Name);
         if (data == null) return;
 
-        // 记录受伤时间
-        data.LastHurtTime = DateTime.UtcNow;
         // 更新生命值记录（此处获取受伤后生命值）
+        data.LastHurt = DateTime.UtcNow;
         data.Life = plr.TPlayer.statLife;
         data.CheckTime = DateTime.UtcNow;
 
@@ -175,17 +174,46 @@ public class Plugin(Main game) : TerrariaPlugin(game)
     }
     #endregion
 
+    #region 计算玩家预期受到的伤害
+    /// <summary>
+    /// 计算玩家预期受到的伤害（考虑防御、难度、减伤、随机波动）
+    /// </summary>
+    /// <param name="plr">玩家对象</param>
+    /// <param name="origDmg">原始伤害值</param>
+    /// <returns>最终预期伤害（至少1点）</returns>
+    private static int ExpDamage(Player plr, int origDmg)
+    {
+        double defense = plr.statDefense;
+
+        // 根据难度计算防御减伤
+        double dmg = Main.masterMode ? origDmg - defense :
+                     Main.expertMode ? origDmg - defense * 0.75 :
+                     origDmg - defense * 0.5;
+        dmg = Math.Max(1, dmg); // 最低伤害为1
+
+        float endu = plr.endurance; // 百分比减伤（耐力药水、冰障、套装等）
+        dmg *= (endu > 0f ? (1f - endu) : 1f); // 应用减伤系数
+
+        float factor = 1f + (Main.rand.Next(-15, 16) * 0.01f); // 随机波动 ±15%
+        float result = (float)dmg * factor;
+
+        return Math.Max(1, (int)Math.Round(result));  // 取整后至少为1
+    } 
+    #endregion
+
     #region 预惩罚信息公告
     private static void PunMess(TSPlayer plr, MyData data, int dmg)
     {
         var p = plr.TPlayer;
 
-        // 1. 无敌帧或闪避效果 → 不计违规
-        if (p.immune ||p.shadowDodge || p.onHitDodge)
+        // 无敌帧或闪避效果 → 不计违规
+        if (p.immune || p.shadowDodge || p.onHitDodge)
             return;
 
-        // 2. 最近0.5秒内刚受过伤 → 不计违规（保护正常玩家）
-        if ((DateTime.UtcNow - data.LastHurtTime).TotalSeconds < 0.5)
+        // 动态计算无敌帧持续时间（秒）
+        float invSec = p.longInvince ? 1.33f : 0.67f; // 80帧或40帧 @ 60FPS
+        if (data.LastHurt == DateTime.MinValue ||
+            (DateTime.UtcNow - data.LastHurt).TotalSeconds < invSec)
             return;
 
         // 惩罚
