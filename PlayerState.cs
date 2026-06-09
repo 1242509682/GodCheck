@@ -54,16 +54,11 @@ internal class PlayerState
 
         if (plr != null)
         {
-            if (plr.HasPermission(MyCmd.prem)) return;
+            if (PlrData.ContainsKey(plr.Name))
+                PlrData.Remove(plr.Name);
 
-            if (Config.PunList.Contains(plr.Name))
-            {
-                if (PlrData.ContainsKey(plr.Name))
-                    PlrData.Remove(plr.Name);
-
-                if (PunTP.Contains(plr))
-                    PunTP.Remove(plr);
-            }
+            if (PunTP.Contains(plr))
+                PunTP.Remove(plr);
         }
     }
     #endregion
